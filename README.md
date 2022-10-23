@@ -5,4 +5,90 @@ This provides sample codes to show Swagger UI on root (`/`), instead of `/api/sw
 
 ## Getting Started ##
 
-TBD
+There are two function apps available &ndash; one for the in-proc worker and the other for the out-of-proc worker. Take a look at your preferred function app depending on your situation.
+
+To use the root page as Swagger UI, follow the steps below. Note that there's no way to use HTTP URL rewrite feature as of today.
+
+
+### `host.json` ###
+
+Update your `host.json` like below:
+
+```jsonc
+{
+  "version": "2.0",
+  ...
+  "extensions": {
+    "http": {
+      // Remove the default route prefix from 'api' to ''
+      "routePrefix": ""
+    }
+  }
+}
+```
+
+
+### `local.settings.json` or app settings on Azure ###
+
+Add the following app settings key:
+
+```jsonc
+{
+  "IsEncrypted": false,
+  "Values": {
+    ...
+    // Disable the homepage
+    "AzureWebJobsDisableHomepage": true,
+    ...
+  }
+}
+```
+
+
+## Redirect HTTP Trigger ###
+
+Add a new HTTP trigger for URL redirection.
+
+```csharp
+// In-Proc function
+public class RedirectHttpTrigger
+{
+    // Add this HTTP trigger for URL redirection
+    [FunctionName(nameof(RedirectHttpTrigger.Redirect))]
+    [OpenApiIgnore()]
+    public async Task<IActionResult> Redirect(
+        // Make sure the route MUST be "/"
+        [HttpTrigger(AuthorizationLevel.Anonymous, "GET", Route = "/")] HttpRequest req)
+    {
+        this._logger.LogInformation("C# HTTP trigger function processed a request.");
+
+        // Make sure the redirection URL MUST be "/swagger/ui"
+        var result = new RedirectResult("/swagger/ui", permanent: true);
+
+        return await Task.FromResult(result).ConfigureAwait(false);
+    }
+}
+
+// Out-of-Proc function
+public class RedirectHttpTrigger
+{
+    // Add this HTTP trigger for URL redirection
+    [Function(nameof(RedirectHttpTrigger.Redirect))]
+    [OpenApiIgnore()]
+    public HttpResponseData Redirect(
+        // Make sure the route MUST be "/"
+        [HttpTrigger(AuthorizationLevel.Anonymous, "GET", Route = "/")] HttpRequestData req)
+    {
+        _logger.LogInformation("C# HTTP trigger function processed a request.");
+
+        // Make sure to put the HTTP status code of 301 (move permanently)
+        var response = req.CreateResponse(HttpStatusCode.MovedPermanently);
+    
+        // Make sure to put the "Location" header with the redirection URL of "/swagger/ui"
+        response.Headers.Add("Location", "/swagger/ui");
+
+        return response;
+    }
+}
+```
+
