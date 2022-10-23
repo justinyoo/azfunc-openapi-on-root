@@ -92,3 +92,19 @@ public class RedirectHttpTrigger
 }
 ```
 
+
+## Running on GitHub Codespaces ##
+
+If you want to run this sample app on your GitHub Codespaces, please run the script first:
+
+```bash
+# On bash shell
+pwsh -c "Invoke-RestMethod https://aka.ms/azfunc-openapi/add-codespaces.ps1 | Invoke-Expression"
+```
+
+```powershell
+# On PowerShell
+Invoke-RestMethod https://aka.ms/azfunc-openapi/add-codespaces.ps1 | Invoke-Expression
+```
+
+This script will update your `local.settings.json` file to accommodate your GitHub Codespaces to work as a local running environment.
