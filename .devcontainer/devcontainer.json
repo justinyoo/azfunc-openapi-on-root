@@ -82,7 +82,7 @@
         "kreativ-software.csharpextensions",
 
         // Recommended extensions - Power Platform
-        "microsoft-IsvExpTools.powerplatform-vscode",
+        // "microsoft-IsvExpTools.powerplatform-vscode",
 
         // Recommended extensions - Markdown
         "bierner.github-markdown-preview",
