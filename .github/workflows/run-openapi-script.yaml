@@ -1,0 +1,81 @@
+name: 'Run OpenAPI Script'
+
+on: workflow_call
+
+jobs:
+  run_openapi_script:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        type: [ { "suffix": "in-proc", "path": "InProc" }, { "suffix": "out-of-proc", "path": "OutOfProc" } ]
+
+    steps:
+    - name: Checkout the repo
+      uses: actions/checkout@v2
+
+    - name: Setup .NET SDK
+      uses: actions/setup-dotnet@v1
+      with:
+        dotnet-version: 6.x
+
+    - name: Copy local.settings.json
+      shell: pwsh
+      run: |
+        $localSettingsSampleJsons = Get-ChildItem -path "local.settings.sample.json" -Recurse
+        $localSettingsSampleJsons | ForEach-Object {
+            Copy-Item -Path "$($_.FullName)" -Destination "$($_.Directory.FullName)/local.settings.json" -Force
+        }
+
+    - name: Restore NuGet packages
+      shell: bash
+      run: |
+        dotnet restore .
+
+    - name: Build solution
+      shell: bash
+      run: |
+        dotnet build . -c Release
+
+    - name: Test solution
+      shell: bash
+      run: |
+        dotnet test . -c Release
+
+    - name: Install Azure Functions Core Tools
+      shell: bash
+      run: |
+        npm install -g azure-functions-core-tools@4 --unsafe-perm true
+
+    - name: Build OpenAPI document from PowerShell script (${{ matrix.type.suffix }})
+      shell: pwsh
+      run: |
+        & $([Scriptblock]::Create($(Invoke-RestMethod https://aka.ms/azfunc-openapi/generate-openapi.ps1))) `
+          -FunctionAppPath "src/${{ matrix.type.path }}" `
+          -BaseUri "http://localhost:7071/" `
+          -Endpoint "swagger.json" `
+          -OutputFilename "${{ matrix.type.suffix }}-ps1.json" `
+          -Delay 30
+
+    - name: Check generated OpenAPI document from PowerShell script (${{ matrix.type.suffix }})
+      shell: pwsh
+      run: |
+        $json = Get-Content -Path "generated/${{ matrix.type.suffix }}-ps1.json"
+        echo "$json"
+
+    - name: Build OpenAPI document from bash script (${{ matrix.type.suffix }})
+      shell: bash
+      run: |
+        curl -fsSL https://aka.ms/azfunc-openapi/generate-openapi.sh \
+          | bash -s -- \
+            -p "src/${{ matrix.type.path }}" \
+            -u "http://localhost:7071" \
+            -e "swagger.json" \
+            -f "${{ matrix.type.suffix }}-sh.json" \
+            -d 30
+
+    - name: Check generated OpenAPI document from bash script (${{ matrix.type.suffix }})
+      shell: pwsh
+      run: |
+        $json = Get-Content -Path "generated/${{ matrix.type.suffix }}-sh.json"
+        echo "$json"

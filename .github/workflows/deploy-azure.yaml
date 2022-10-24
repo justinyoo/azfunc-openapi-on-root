@@ -1,0 +1,74 @@
+name: Deploy to Azure
+
+on:
+  workflow_call:
+    inputs:
+      artifact_name:
+        type: string
+        required: false
+        description: Artifact name of the function app
+        default: 'fncapps'
+      resource_name:
+        type: string
+        required: false
+        description: Azure resource name
+        default: ''
+
+env:
+  AZURE_RESOURCE_GROUP_NAME: 'rg-${{ inputs.resource_name }}'
+  AZURE_RESOURCE_NAME: ${{ inputs.resource_name }}
+
+jobs:
+  deploy_azure:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        suffix: [ 'in-proc', 'out-of-proc' ]
+
+    steps:
+    - name: Set up environment variables
+      shell: pwsh
+      run: |
+        if (("${{ env.AZURE_RESOURCE_NAME }}" -eq $null) -or ("${{ env.AZURE_RESOURCE_NAME }}" -eq "")) {
+          echo "AZURE_RESOURCE_GROUP_NAME=rg-${{ secrets.AZURE_RESOURCE_NAME }}" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf-8 -Append
+          echo "AZURE_RESOURCE_NAME=${{ secrets.AZURE_RESOURCE_NAME }}" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf-8 -Append
+        }
+
+    - name: Download Function app artifacts
+      uses: actions/download-artifact@v3
+      with:
+        path: ${{ github.workspace }}/published
+
+    - name: Set function app name
+      shell: bash
+      run: |
+        fncapp_name="fncapp-${{ env.AZURE_RESOURCE_NAME }}-${{ matrix.suffix }}"
+
+        echo "FUNCTION_APP_NAME=$fncapp_name" >> $GITHUB_ENV
+
+    - name: Zip Function app artifact
+      shell: bash
+      run: |
+        src_path="published/${{ inputs.artifact_name }}/${{ matrix.suffix }}"
+        dest_path="$src_path/fncapp.zip"
+
+        cd $GITHUB_WORKSPACE/$src_path
+        zip -r fncapp.zip ./
+
+        echo "FUNCTION_APP_PATH=$dest_path" >> $GITHUB_ENV
+    
+    - name: Sign in to Azure
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+    - name: Deploy FunctionApp artifact to Azure
+      shell: bash
+      run: |
+        az functionapp deploy \
+          -g ${{ env.AZURE_RESOURCE_GROUP_NAME }} \
+          -n ${{ env.FUNCTION_APP_NAME }} \
+          --src-path ${{ env.FUNCTION_APP_PATH }} \
+          --type zip \
+          --verbose

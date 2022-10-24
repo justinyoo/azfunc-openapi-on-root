@@ -1,0 +1,58 @@
+name: 'Run OpenAPI Action'
+
+on: workflow_call
+
+jobs:
+  run_openapi_action:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        type: [ { "suffix": "in-proc", "path": "InProc" }, { "suffix": "out-of-proc", "path": "OutOfProc" } ]
+
+    steps:
+    - name: Checkout the repo
+      uses: actions/checkout@v2
+
+    - name: Setup .NET SDK
+      uses: actions/setup-dotnet@v1
+      with:
+        dotnet-version: 6.x
+
+    - name: Copy local.settings.json
+      shell: pwsh
+      run: |
+        $localSettingsSampleJsons = Get-ChildItem -path "local.settings.sample.json" -Recurse
+        $localSettingsSampleJsons | ForEach-Object {
+            Copy-Item -Path "$($_.FullName)" -Destination "$($_.Directory.FullName)/local.settings.json" -Force
+        }
+
+    - name: Restore NuGet packages
+      shell: bash
+      run: |
+        dotnet restore .
+
+    - name: Build solution
+      shell: bash
+      run: |
+        dotnet build . -c Release
+
+    - name: Test solution
+      shell: bash
+      run: |
+        dotnet test . -c Release
+
+    - name: Build OpenAPI document (${{ matrix.type.suffix }})
+      id: ip
+      uses: Azure/azure-functions-openapi-extension/actions/build-openapi@v1
+      with:
+        functionAppPath: "src/${{ matrix.type.path }}"
+        requestUri: "http://localhost:7071/swagger.json"
+        documentName: "${{ matrix.type.suffix }}.json"
+        delay: 30
+
+    - name: Check generated OpenAPI document (${{ matrix.type.suffix }})
+      shell: pwsh
+      run: |
+        $json = Get-Content -Path ${{ steps.ip.outputs.generated }}
+        echo "$json"
