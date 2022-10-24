@@ -68,7 +68,9 @@ public class RedirectHttpTrigger
         return await Task.FromResult(result).ConfigureAwait(false);
     }
 }
+```
 
+```csharp
 // Out-of-Proc function
 public class RedirectHttpTrigger
 {
@@ -108,3 +110,16 @@ Invoke-RestMethod https://aka.ms/azfunc-openapi/add-codespaces.ps1 | Invoke-Expr
 ```
 
 This script will update your `local.settings.json` file to accommodate your GitHub Codespaces to work as a local running environment.
+
+
+## Deploy to Azure ##
+
+To deploy both Azure Functions app, you can use [Azure Developer CLI](https://learn.microsoft.com/azure/developer/azure-developer-cli/overview?WT.mc_id=dotnet-79949-juyoo) by running those two commands:
+
+```bash
+# Initialise environment
+azd init
+
+# Provision and deploy apps
+azd up
+```
